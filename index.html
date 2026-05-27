@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리 아이 학원 스케줄 대시보드</title>
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons (CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- 커스텀 스타일 (스크롤바, 폰트, 애니메이션) -->
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', sans-serif; }
+        .marquee-container { overflow: hidden; white-space: nowrap; width: 100%; position: relative; }
+        .marquee-content { display: inline-block; animation: marquee 20s linear infinite; padding-left: 100%; }
+        @keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+        /* 스크롤바 숨기기 (가로/세로) */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-white transition-colors duration-300">
+
+    <!-- 최상단 헤더 -->
+    <header class="sticky top-0 z-40 shadow-sm px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 transition-colors duration-300">
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <div class="flex flex-col">
+                <div class="flex gap-2 items-center mb-1">
+                    <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300">구글 클라우드 동기화</span>
+                    <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-300">구글 시트 실시간 연동됨 (UI)</span>
+                </div>
+                <h1 class="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tight">
+                    우리 아이 학원 스케줄 대시보드 📅
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mt-1">
+                    <span class="text-indigo-500">🎓</span> 개발자: 가치있는 미래교육 연구소 대표 : 김병찬
+                </p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
+            <span id="sync-status" class="text-xs text-slate-400 mr-2 whitespace-nowrap">초기화됨</span>
+            <button id="btn-sync" class="flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600">
+                <i data-lucide="refresh-cw" class="w-4 h-4 sync-icon"></i> <span id="sync-text">새로고침</span>
+            </button>
+            <button id="btn-darkmode" class="p-2 sm:p-2.5 rounded-xl transition-all bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-yellow-300">
+                <i data-lucide="moon" class="w-[18px] h-[18px]"></i>
+            </button>
+            <div id="auth-btn-container">
+                <!-- 인증 버튼이 자바스크립트로 렌더링됨 -->
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 레이아웃 -->
+    <main class="p-4 sm:p-6 max-w-[1600px] mx-auto flex flex-col lg:flex-row gap-6">
+        
+        <!-- 좌측 패널 -->
+        <aside class="w-full lg:w-[320px] flex flex-col gap-4 sm:gap-6 flex-shrink-0">
+            
+            <!-- 디지털 시계 -->
+            <div class="bg-[#1e2335] text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-pink-400"></div>
+                <div id="clock-date" class="text-slate-300 text-sm sm:text-base font-medium mb-1">
+                    <!-- 날짜 들어갈 곳 -->
+                </div>
+                <div class="text-4xl sm:text-5xl font-black tracking-wider mb-2 font-mono flex items-baseline gap-2">
+                    <span id="clock-hm">00:00</span>
+                    <span id="clock-s" class="text-xl sm:text-2xl text-slate-400 font-bold">:00</span>
+                </div>
+                <div class="text-xs sm:text-sm text-emerald-400 flex items-center gap-1.5 font-semibold">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    실시간 일정 추적 활성화
+                </div>
+            </div>
+
+            <!-- 미니 전광판 -->
+            <div id="marquee-container" class="rounded-3xl p-5 shadow-sm border-2 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 transition-all">
+                <!-- 자바스크립트로 렌더링 됨 -->
+            </div>
+
+            <!-- 오늘의 학원 일정 -->
+            <div class="rounded-3xl p-5 sm:p-6 shadow-sm flex-1 bg-white border border-slate-100 dark:bg-slate-800 dark:border-slate-700">
+                <div class="flex justify-between items-center mb-5">
+                    <h2 class="text-lg font-black flex items-center gap-2">
+                        <i data-lucide="clock" class="text-indigo-500 w-5 h-5"></i>
+                        오늘의 학원 일정 ⏰
+                    </h2>
+                    <span id="today-count" class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm dark:bg-indigo-900/50 dark:text-indigo-300">
+                        0개
+                    </span>
+                </div>
+                <div id="today-schedules" class="flex flex-col gap-3">
+                    <!-- 자바스크립트로 렌더링 됨 -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- 우측 메인 패널 -->
+        <section class="flex-1 flex flex-col min-w-0">
+            
+            <!-- 컨트롤 바 -->
+            <div class="mb-6 flex flex-col sm:flex-row justify-between gap-4 p-2 rounded-2xl bg-white shadow-sm border border-slate-100 dark:bg-slate-800 dark:border-slate-700">
+                <div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-x-auto hide-scrollbar" id="view-filters">
+                    <button data-view="통합" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-400">
+                        <i data-lucide="users" class="w-[18px] h-[18px]"></i> 형제 통합 뷰
+                    </button>
+                    <button data-view="나윤" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600">
+                        <i data-lucide="user" class="w-[18px] h-[18px]"></i> 나윤 (딸)
+                    </button>
+                    <button data-view="태윤" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600">
+                        <i data-lucide="user" class="w-[18px] h-[18px]"></i> 태윤 (아들)
+                    </button>
+                </div>
+
+                <div class="relative flex-1 sm:max-w-xs px-2 sm:px-0 flex items-center">
+                    <i data-lucide="search" class="absolute left-5 sm:left-3 text-slate-400 w-[18px] h-[18px]"></i>
+                    <input 
+                        type="text" 
+                        id="search-input"
+                        placeholder="학원 또는 과목 검색..." 
+                        class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-all bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
+                    />
+                </div>
+            </div>
+
+            <!-- 주간 스케줄 그리드 -->
+            <div class="flex-1 overflow-x-auto pb-4 hide-scrollbar">
+                <div id="weekly-grid" class="flex gap-4 min-w-[900px] h-full items-stretch">
+                    <!-- 자바스크립트로 렌더링 됨 -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="py-6 text-center text-xs font-medium border-t mt-auto border-slate-200 text-slate-400 dark:border-slate-800 dark:text-slate-500">
+        <p>가치있는 미래교육 연구소 | 대표 김병찬</p>
+        <p class="mt-1">© 2026 Valued Future Education Lab. All Rights Reserved.</p>
+    </footer>
+
+    <!-- 부모 인증 모달 (숨김 기본값) -->
+    <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity hidden">
+        <div class="w-full max-w-sm rounded-3xl p-6 shadow-2xl relative bg-white dark:bg-slate-800">
+            <button id="close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-indigo-900/50 dark:text-indigo-400">
+                    <i data-lucide="lock" class="w-8 h-8"></i>
+                </div>
+                <h2 class="text-xl font-black mb-1">부모 인증</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">설정 시트에 등록된 비밀번호를 입력하세요.</p>
+            </div>
+            
+            <form id="auth-form">
+                <input 
+                    type="password" 
+                    id="password-input"
+                    placeholder="비밀번호 입력"
+                    class="w-full text-center tracking-widest text-lg p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-4 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:focus:ring-indigo-900"
+                />
+                <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95">
+                    인증 및 편집 모드 진입
+                </button>
+            </form>
+            <p class="text-xs text-center text-slate-400 mt-4 flex items-center justify-center gap-1">
+                <i data-lucide="alert-circle" class="w-3 h-3"></i> 구글시트 "설정" 탭의 A2 셀 값입니다.
+            </p>
+        </div>
+    </div>
+
+    <!-- 스크립트 로직 -->
+    <script>
+        // --- 상태 변수 ---
+        const SHEET_ID = '1ZbPazY46kzoGNB19Oq_JS51cFRYmY2qaN8IFz6Ypl_s';
+        const URL_PREFIX = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+        
+        const INITIAL_MOCK_DATA = [
+            { id: 1, child: '나윤', day: '월요일', startTime: '18:00', endTime: '21:00', title: '학교', subject: '야간자습', color: 'pink' },
+            { id: 2, child: '태윤', day: '월요일', startTime: '19:00', endTime: '22:00', title: '봉국어', subject: '국어', color: 'blue' },
+            { id: 3, child: '나윤', day: '화요일', startTime: '16:30', endTime: '19:00', title: '옥수학', subject: '수학', color: 'pink' },
+            { id: 4, child: '태윤', day: '화요일', startTime: '18:00', endTime: '22:25', title: '학교', subject: '심야자습', color: 'blue' },
+            { id: 5, child: '나윤', day: '수요일', startTime: '18:00', endTime: '21:00', title: '학교', subject: '야간자습', color: 'pink' },
+            { id: 6, child: '태윤', day: '수요일', startTime: '19:00', endTime: '22:00', title: '봉국어', subject: '국어', color: 'blue' },
+            { id: 7, child: '나윤', day: '목요일', startTime: '18:30', endTime: '20:40', title: '손샘', subject: '영어', color: 'pink' },
+            { id: 8, child: '태윤', day: '목요일', startTime: '19:00', endTime: '22:00', title: '영어', subject: '일등', color: 'blue' },
+            { id: 9, child: '나윤', day: '금요일', startTime: '16:30', endTime: '19:00', title: '옥수학', subject: '수학', color: 'pink' },
+            { id: 10, child: '태윤', day: '금요일', startTime: '18:00', endTime: '22:25', title: '학교', subject: '심야자습', color: 'blue' },
+            { id: 11, child: '태윤', day: '토요일', startTime: '09:30', endTime: '12:00', title: '수학', subject: '디오수', color: 'blue' },
+            { id: 12, child: '나윤', day: '토요일', startTime: '13:00', endTime: '16:00', title: '수학', subject: '디오수', color: 'pink' },
+            { id: 13, child: '태윤', day: '토요일', startTime: '15:30', endTime: '20:00', title: '옥수학', subject: '수학', color: 'blue' },
+            { id: 14, child: '나윤', day: '일요일', startTime: '13:00', endTime: '15:30', title: '국어', subject: '인사이트', color: 'pink' },
+            { id: 15, child: '태윤', day: '일요일', startTime: '19:00', endTime: '21:00', title: '영어', subject: '일등', color: 'blue' },
+        ];
+        const DAYS = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+
+        let state = {
+            schedules: [...INITIAL_MOCK_DATA],
+            viewMode: '통합',
+            searchTerm: '',
+            isDarkMode: false,
+            isSyncing: false,
+            settings: { password: '1234', notice: '오늘 저녁은 다같이 외식합니다! 학원 끝나고 바로 집으로 오세요 😊' },
+            isEditMode: false,
+            editNotice: ''
+        };
+
+        // --- 유틸리티 함수 ---
+        const parseCSV = (csvText) => {
+            const rows = [];
+            let currentRow = [];
+            let currentCell = '';
+            let insideQuotes = false;
+
+            for (let i = 0; i < csvText.length; i++) {
+                const char = csvText[i];
+                const nextChar = csvText[i + 1];
+
+                if (char === '"' && insideQuotes && nextChar === '"') {
+                    currentCell += '"'; i++;
+                } else if (char === '"') {
+                    insideQuotes = !insideQuotes;
+                } else if (char === ',' && !insideQuotes) {
+                    currentRow.push(currentCell.trim());
+                    currentCell = '';
+                } else if (char === '\n' && !insideQuotes) {
+                    currentRow.push(currentCell.trim());
+                    rows.push(currentRow);
+                    currentRow = []; currentCell = '';
+                } else {
+                    currentCell += char;
+                }
+            }
+            if (currentCell || currentRow.length > 0) {
+                currentRow.push(currentCell.trim());
+                rows.push(currentRow);
+            }
+            return rows;
+        };
+
+        const getCurrentDayString = () => {
+            const index = new Date().getDay();
+            return index === 0 ? '일요일' : DAYS[index - 1];
+        };
+
+        // --- 렌더링 함수 ---
+        const renderHeaderAuthButton = () => {
+            const container = document.getElementById('auth-btn-container');
+            if (state.isEditMode) {
+                container.innerHTML = `
+                    <button id="btn-edit-done" class="flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2 rounded-xl text-sm font-semibold bg-green-500 text-white hover:bg-green-600 shadow-md whitespace-nowrap transition-all">
+                        <i data-lucide="unlock" class="w-4 h-4"></i> 편집 완료
+                    </button>
+                `;
+                document.getElementById('btn-edit-done').addEventListener('click', () => {
+                    state.isEditMode = false;
+                    renderApp();
+                });
+            } else {
+                container.innerHTML = `
+                    <button id="btn-auth-open" class="flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-md whitespace-nowrap transition-all">
+                        <i data-lucide="lock" class="w-4 h-4"></i> 부모 인증 (편집)
+                    </button>
+                `;
+                document.getElementById('btn-auth-open').addEventListener('click', () => {
+                    document.getElementById('auth-modal').classList.remove('hidden');
+                    document.getElementById('password-input').focus();
+                });
+            }
+        };
+
+        const renderMarquee = () => {
+            const container = document.getElementById('marquee-container');
+            if (state.isEditMode) {
+                container.className = "rounded-3xl p-5 shadow-sm border-2 border-indigo-400 ring-4 ring-indigo-100 bg-white dark:bg-slate-800 transition-all";
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-sm flex items-center gap-2">
+                            <i data-lucide="megaphone" class="text-indigo-500 w-4 h-4"></i> 부모님 전달사항
+                        </h3>
+                        <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">편집 중</span>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <textarea id="notice-textarea" class="w-full text-sm p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-400 outline-none resize-none h-24 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="아이들에게 전달할 메시지를 입력하세요."></textarea>
+                        <button id="btn-save-notice" class="bg-indigo-600 text-white text-sm font-bold py-2 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-1">
+                            <i data-lucide="check" class="w-4 h-4"></i> 저장하기
+                        </button>
+                    </div>
+                `;
+                document.getElementById('notice-textarea').value = state.editNotice;
+                document.getElementById('notice-textarea').addEventListener('input', (e) => state.editNotice = e.target.value);
+                document.getElementById('btn-save-notice').addEventListener('click', () => {
+                    state.settings.notice = state.editNotice;
+                    state.isEditMode = false;
+                    alert('전달사항이 저장되었습니다. (참고: 실제 구글 시트에 저장하려면 Google Apps Script 연동이 필요합니다.)');
+                    renderApp();
+                });
+            } else {
+                container.className = "rounded-3xl p-5 shadow-sm border-2 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 transition-all";
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-sm flex items-center gap-2">
+                            <i data-lucide="megaphone" class="text-indigo-500 w-4 h-4"></i> 부모님 전달사항
+                        </h3>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 h-16 flex items-center marquee-container overflow-hidden dark:bg-amber-900/20 dark:border-amber-900/50">
+                        <p class="text-amber-800 font-semibold text-sm sm:text-base marquee-content whitespace-nowrap dark:text-amber-200">
+                            ${state.settings.notice || "오늘의 전달사항이 없습니다."}
+                        </p>
+                    </div>
+                `;
+            }
+        };
+
+        const generateChildBadge = (child, color) => {
+            const colorClass = color === 'pink' 
+                ? 'bg-pink-100 text-pink-600 dark:bg-pink-900/50 dark:text-pink-300' 
+                : 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300';
+            return `<span class="px-2 py-0.5 rounded-full text-xs font-bold ${colorClass}">${child}</span>`;
+        };
+
+        const renderToday = () => {
+            const todayStr = getCurrentDayString();
+            const todaySchedules = state.schedules
+                .filter(s => s.day === todayStr)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            document.getElementById('today-count').textContent = `${todaySchedules.length}개`;
+            
+            const container = document.getElementById('today-schedules');
+            if (todaySchedules.length > 0) {
+                container.innerHTML = todaySchedules.map(schedule => {
+                    const bgClass = schedule.color === 'pink'
+                        ? 'bg-pink-50/50 border-pink-100 dark:bg-pink-900/20 dark:border-pink-800/50'
+                        : 'bg-blue-50/50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800/50';
+                    const textClass = schedule.color === 'pink' ? 'text-pink-600 dark:text-pink-400' : 'text-blue-600 dark:text-blue-400';
+
+                    return `
+                        <div class="p-4 rounded-2xl border flex flex-col gap-2 transition-transform hover:scale-[1.02] ${bgClass}">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-bold flex items-center gap-1.5 ${textClass}">
+                                    ${schedule.startTime} <span class="text-slate-300 dark:text-slate-600 text-xs">→</span> ${schedule.endTime}
+                                </span>
+                                ${generateChildBadge(schedule.child, schedule.color)}
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-black">${schedule.title}</h4>
+                                <p class="text-xs font-bold mt-1 flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                                    <span class="text-[10px]">📚</span> ${schedule.subject}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-10 text-slate-400">
+                        <i data-lucide="calendar" class="w-10 h-10 mb-2 opacity-50"></i>
+                        <p class="text-sm font-medium">오늘은 일정이 없습니다. 휴식! 🏖️</p>
+                    </div>
+                `;
+            }
+        };
+
+        const renderWeekly = () => {
+            const todayStr = getCurrentDayString();
+            const filtered = state.schedules.filter(s => {
+                const matchView = state.viewMode === '통합' || s.child === state.viewMode;
+                const matchSearch = s.title.includes(state.searchTerm) || s.subject.includes(state.searchTerm);
+                return matchView && matchSearch;
+            });
+
+            const container = document.getElementById('weekly-grid');
+            container.innerHTML = DAYS.map(day => {
+                const daySchedules = filtered
+                    .filter(s => s.day === day)
+                    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                
+                const isToday = day === todayStr;
+                const wrapperClass = isToday 
+                    ? 'ring-4 ring-indigo-500/20 shadow-lg scale-[1.02] bg-white dark:bg-indigo-900/30' 
+                    : 'bg-white shadow-sm dark:bg-slate-800';
+                
+                const headerClass = isToday
+                    ? 'border-indigo-100 bg-indigo-50/50 dark:border-indigo-900/50 dark:bg-indigo-900/50'
+                    : 'border-slate-50 dark:border-slate-700';
+
+                const titleClass = isToday ? 'text-indigo-600 dark:text-indigo-400' : '';
+
+                const itemsHtml = daySchedules.map(schedule => {
+                    const itemBg = schedule.color === 'pink'
+                        ? 'bg-white border-pink-100 dark:bg-slate-800 dark:border-pink-900/50'
+                        : 'bg-white border-blue-100 dark:bg-slate-800 dark:border-blue-900/50';
+                    const timeColor = schedule.color === 'pink' ? 'text-pink-500 dark:text-pink-400' : 'text-blue-500 dark:text-blue-400';
+                    const dotClass = schedule.color === 'pink' ? 'bg-pink-400' : 'bg-blue-400';
+
+                    return `
+                        <div class="p-3.5 rounded-2xl border-2 flex flex-col gap-1 hover:-translate-y-1 transition-transform cursor-default shadow-sm ${itemBg}">
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="text-xs font-black tracking-tight ${timeColor}">
+                                    ${schedule.startTime} <span class="text-slate-300 dark:text-slate-600 mx-0.5">-</span> ${schedule.endTime}
+                                </span>
+                                ${state.viewMode === '통합' ? `<div class="w-2 h-2 rounded-full ${dotClass}"></div>` : ''}
+                            </div>
+                            <h4 class="text-base sm:text-lg font-black leading-tight">${schedule.title}</h4>
+                            <p class="text-xs font-bold mt-1 flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                                <span class="text-[10px] opacity-70">📐</span> ${schedule.subject}
+                            </p>
+                        </div>
+                    `;
+                }).join('');
+
+                const emptyHtml = daySchedules.length === 0 ? `
+                    <div class="h-full min-h-[100px] flex items-center justify-center">
+                        <div class="w-8 h-1 rounded-full bg-slate-100 dark:bg-slate-700"></div>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="flex-1 min-w-[140px] flex flex-col rounded-3xl overflow-hidden transition-all duration-300 ${wrapperClass}">
+                        <div class="p-4 text-center border-b ${headerClass}">
+                            <div class="flex items-center justify-center gap-2">
+                                <h3 class="text-lg sm:text-xl font-black ${titleClass}">${day}</h3>
+                                ${isToday ? '<span class="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">오늘</span>' : ''}
+                            </div>
+                            <span class="text-xs font-semibold text-slate-400 mt-1 inline-block bg-slate-100 dark:bg-slate-700 px-2 rounded-full">
+                                ${daySchedules.length}개
+                            </span>
+                        </div>
+                        <div class="p-3 flex flex-col gap-3 overflow-y-auto">
+                            ${itemsHtml}
+                            ${emptyHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        const renderFilters = () => {
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => {
+                const view = btn.dataset.view;
+                if (state.viewMode === view) {
+                    btn.className = "filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-400";
+                } else {
+                    btn.className = "filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600";
+                }
+            });
+        };
+
+        const renderApp = () => {
+            renderHeaderAuthButton();
+            renderMarquee();
+            renderFilters();
+            renderToday();
+            renderWeekly();
+            lucide.createIcons(); // DOM 갱신 후 아이콘 재생성
+        };
+
+        // --- 구글 시트 동기화 로직 ---
+        const fetchSheetData = async () => {
+            if (state.isSyncing) return;
+            state.isSyncing = true;
+            document.getElementById('sync-status').textContent = '동기화 중...';
+            document.querySelector('.sync-icon').classList.add('animate-spin');
+            
+            try {
+                // 1. 설정
+                const settingsRes = await fetch(URL_PREFIX + '설정');
+                if (settingsRes.ok) {
+                    const settingsCsv = await settingsRes.text();
+                    const settingsData = parseCSV(settingsCsv);
+                    if (settingsData.length > 1) {
+                        state.settings = {
+                            password: settingsData[1][0] || '1234',
+                            notice: settingsData[1][1] || ''
+                        };
+                        if(!state.isEditMode) state.editNotice = state.settings.notice;
+                    }
+                }
+
+                // 2. 나윤, 태윤
+                const [nayoonRes, taeyoonRes] = await Promise.all([
+                    fetch(URL_PREFIX + '나윤'),
+                    fetch(URL_PREFIX + '태윤')
+                ]);
+
+                let newSchedules = [];
+
+                const processSheet = async (res, childName, color) => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    const csv = await res.text();
+                    const data = parseCSV(csv);
+                    return data.slice(1).map((row, index) => {
+                        if (row.length < 5) return null;
+                        return {
+                            id: `${childName}-${index}`, child: childName, color: color,
+                            day: row[0], startTime: row[1], endTime: row[2], title: row[3], subject: row[4]
+                        };
+                    }).filter(item => item !== null && item.day);
+                };
+
+                if (nayoonRes.ok) newSchedules = [...newSchedules, ...(await processSheet(nayoonRes, '나윤', 'pink'))];
+                if (taeyoonRes.ok) newSchedules = [...newSchedules, ...(await processSheet(taeyoonRes, '태윤', 'blue'))];
+
+                if (newSchedules.length > 0) {
+                    state.schedules = newSchedules;
+                    document.getElementById('sync-status').textContent = '동기화 완료';
+                } else {
+                    throw new Error('No valid data');
+                }
+
+            } catch (error) {
+                console.warn("구글 시트 연동 실패", error);
+                document.getElementById('sync-status').textContent = '동기화 실패 (기본 데이터)';
+            } finally {
+                state.isSyncing = false;
+                document.querySelector('.sync-icon').classList.remove('animate-spin');
+                renderApp();
+                setTimeout(() => document.getElementById('sync-status').textContent = '', 3000);
+            }
+        };
+
+        // --- 초기화 및 이벤트 리스너 ---
+        const init = () => {
+            // 시계 타이머
+            const updateClock = () => {
+                const now = new Date();
+                const daysStr = ['일', '월', '화', '수', '목', '금', '토'];
+                document.getElementById('clock-date').textContent = 
+                    `${now.getFullYear()}년 ${String(now.getMonth() + 1).padStart(2, '0')}월 ${String(now.getDate()).padStart(2, '0')}일 (${daysStr[now.getDay()]})`;
+                document.getElementById('clock-hm').textContent = 
+                    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                document.getElementById('clock-s').textContent = `:${String(now.getSeconds()).padStart(2, '0')}`;
+            };
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // 이벤트 바인딩
+            document.getElementById('btn-sync').addEventListener('click', fetchSheetData);
+            
+            document.getElementById('btn-darkmode').addEventListener('click', () => {
+                state.isDarkMode = !state.isDarkMode;
+                if (state.isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            });
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.viewMode = e.currentTarget.dataset.view;
+                    renderApp();
+                });
+            });
+
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                state.searchTerm = e.target.value;
+                renderWeekly(); // 검색은 주간만 리렌더링
+            });
+
+            // 모달 처리
+            const modal = document.getElementById('auth-modal');
+            document.getElementById('close-modal').addEventListener('click', () => modal.classList.add('hidden'));
+            document.getElementById('auth-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const pwd = document.getElementById('password-input').value;
+                if (pwd === state.settings.password) {
+                    state.isEditMode = true;
+                    state.editNotice = state.settings.notice;
+                    modal.classList.add('hidden');
+                    document.getElementById('password-input').value = '';
+                    renderApp();
+                } else {
+                    alert('비밀번호가 일치하지 않습니다.');
+                }
+            });
+
+            // 첫 데이터 로드
+            fetchSheetData();
+        };
+
+        // 앱 시작
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
