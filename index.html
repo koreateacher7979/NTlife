@@ -223,7 +223,7 @@
         const DAYS = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
 
         let state = {
-            schedules: [...INITIAL_MOCK_DATA],
+            schedules: [], // 초기 데이터를 비워서 실제 데이터를 로드하도록 변경
             viewMode: '통합',
             searchTerm: '',
             isDarkMode: false,
@@ -233,37 +233,44 @@
             editNotice: ''
         };
 
-        // --- 유틸리티 함수 ---
-        const parseCSV = (csvText) => {
-            const rows = [];
-            let currentRow = [];
-            let currentCell = '';
-            let insideQuotes = false;
-
-            for (let i = 0; i < csvText.length; i++) {
-                const char = csvText[i];
-                const nextChar = csvText[i + 1];
-
-                if (char === '"' && insideQuotes && nextChar === '"') {
-                    currentCell += '"'; i++;
+        // --- 강력한 CSV 파서 (개선됨: 줄바꿈, 따옴표 완벽 처리) ---
+        const parseCSV = (str) => {
+            const result = [];
+            let row = [];
+            let cell = '';
+            let quote = false;
+            for (let i = 0; i < str.length; i++) {
+                let char = str[i], nextChar = str[i + 1];
+                
+                if (char === '"' && quote && nextChar === '"') {
+                    cell += '"';
+                    i++;
                 } else if (char === '"') {
-                    insideQuotes = !insideQuotes;
-                } else if (char === ',' && !insideQuotes) {
-                    currentRow.push(currentCell.trim());
-                    currentCell = '';
-                } else if (char === '\n' && !insideQuotes) {
-                    currentRow.push(currentCell.trim());
-                    rows.push(currentRow);
-                    currentRow = []; currentCell = '';
+                    quote = !quote;
+                } else if (char === ',' && !quote) {
+                    row.push(cell.trim());
+                    cell = '';
+                } else if (char === '\n' && !quote) {
+                    row.push(cell.trim());
+                    result.push(row);
+                    row = [];
+                    cell = '';
+                } else if (char === '\r' && !quote) {
+                    if (nextChar !== '\n') {
+                        row.push(cell.trim());
+                        result.push(row);
+                        row = [];
+                        cell = '';
+                    }
                 } else {
-                    currentCell += char;
+                    cell += char;
                 }
             }
-            if (currentCell || currentRow.length > 0) {
-                currentRow.push(currentCell.trim());
-                rows.push(currentRow);
+            if (cell || row.length > 0) {
+                row.push(cell.trim());
+                result.push(row);
             }
-            return rows;
+            return result;
         };
 
         const getCurrentDayString = () => {
@@ -308,23 +315,34 @@
                         </h3>
                         <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">편집 중</span>
                     </div>
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-3">
                         <textarea id="notice-textarea" class="w-full text-sm p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-400 outline-none resize-none h-24 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="아이들에게 전달할 메시지를 입력하세요."></textarea>
-                        <button id="btn-save-notice" class="bg-indigo-600 text-white text-sm font-bold py-2 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-1 disabled:opacity-70 disabled:cursor-not-allowed">
-                            <i data-lucide="check" class="w-4 h-4"></i> 저장하기
-                        </button>
+                        
+                        <div class="flex gap-2">
+                            <button id="btn-delete-notice" class="flex-1 bg-red-50 text-red-600 text-sm font-bold py-2 rounded-xl border border-red-100 hover:bg-red-100 flex items-center justify-center gap-1 transition-all dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/40">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> 지우기
+                            </button>
+                            <button id="btn-save-notice" class="flex-[2] bg-indigo-600 text-white text-sm font-bold py-2 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-1 disabled:opacity-70 disabled:cursor-not-allowed transition-all">
+                                <i data-lucide="check" class="w-4 h-4"></i> 저장하기
+                            </button>
+                        </div>
                     </div>
                 `;
                 document.getElementById('notice-textarea').value = state.editNotice;
                 document.getElementById('notice-textarea').addEventListener('input', (e) => state.editNotice = e.target.value);
                 
-                // 구글 앱스 스크립트로 저장 요청 보내기 로직 추가
+                // 내용 지우기 버튼 (삭제)
+                document.getElementById('btn-delete-notice').addEventListener('click', () => {
+                    document.getElementById('notice-textarea').value = '';
+                    state.editNotice = '';
+                });
+
+                // 구글 앱스 스크립트로 저장 요청 보내기 (빈 값 저장=삭제 도 가능)
                 document.getElementById('btn-save-notice').addEventListener('click', async () => {
                     const newNotice = state.editNotice;
                     const btn = document.getElementById('btn-save-notice');
                     const originalBtnHtml = btn.innerHTML;
                     
-                    // 웹앱 URL 설정 안내
                     if (GAS_WEB_APP_URL === '여기에_배포된_웹앱_URL을_입력하세요' || !GAS_WEB_APP_URL) {
                         alert('구글 앱스 스크립트 웹앱 URL이 설정되지 않았습니다. 현재 화면에만 임시로 반영됩니다.');
                         state.settings.notice = newNotice;
@@ -333,7 +351,6 @@
                         return;
                     }
 
-                    // 버튼 상태 로딩으로 변경
                     btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 저장 중...`;
                     btn.disabled = true;
                     lucide.createIcons();
@@ -342,7 +359,7 @@
                         const formData = new URLSearchParams();
                         formData.append('action', 'updateNotice');
                         formData.append('notice', newNotice);
-                        formData.append('password', state.settings.password); // 보안용 검증 데이터
+                        formData.append('password', state.settings.password);
 
                         const response = await fetch(GAS_WEB_APP_URL, {
                             method: 'POST',
@@ -531,16 +548,16 @@
             lucide.createIcons(); // DOM 갱신 후 아이콘 재생성
         };
 
-        // --- 구글 시트 동기화 로직 ---
+        // --- 구글 시트 동기화 로직 (개선됨: 한글 시트명 인코딩) ---
         const fetchSheetData = async () => {
             if (state.isSyncing) return;
             state.isSyncing = true;
-            document.getElementById('sync-status').textContent = '동기화 중...';
+            document.getElementById('sync-status').textContent = '데이터 불러오는 중...';
             document.querySelector('.sync-icon').classList.add('animate-spin');
             
             try {
-                // 1. 설정
-                const settingsRes = await fetch(URL_PREFIX + '설정');
+                // 1. 설정 (시트명 인코딩 필수)
+                const settingsRes = await fetch(URL_PREFIX + encodeURIComponent('설정'));
                 if (settingsRes.ok) {
                     const settingsCsv = await settingsRes.text();
                     const settingsData = parseCSV(settingsCsv);
@@ -553,10 +570,10 @@
                     }
                 }
 
-                // 2. 나윤, 태윤
+                // 2. 나윤, 태윤 (시트명 인코딩 필수)
                 const [nayoonRes, taeyoonRes] = await Promise.all([
-                    fetch(URL_PREFIX + '나윤'),
-                    fetch(URL_PREFIX + '태윤')
+                    fetch(URL_PREFIX + encodeURIComponent('나윤')),
+                    fetch(URL_PREFIX + encodeURIComponent('태윤'))
                 ]);
 
                 let newSchedules = [];
@@ -564,14 +581,24 @@
                 const processSheet = async (res, childName, color) => {
                     if (!res.ok) throw new Error('Network response was not ok');
                     const csv = await res.text();
+                    // 구글 시트 비공개 등 에러로 HTML을 반환할 때 방어
+                    if (csv.trim().startsWith('<')) throw new Error('시트 접근 권한 에러');
+                    
                     const data = parseCSV(csv);
                     return data.slice(1).map((row, index) => {
-                        if (row.length < 5) return null;
+                        // 유효성 검사 강화
+                        if (!row || row.length < 2 || !row[0]) return null;
                         return {
-                            id: `${childName}-${index}`, child: childName, color: color,
-                            day: row[0], startTime: row[1], endTime: row[2], title: row[3], subject: row[4]
+                            id: `${childName}-${index}`, 
+                            child: childName, 
+                            color: color,
+                            day: row[0] ? row[0].trim() : '', 
+                            startTime: row[1] ? row[1].trim() : '', 
+                            endTime: row[2] ? row[2].trim() : '', 
+                            title: row[3] ? row[3].trim() : '', 
+                            subject: row[4] ? row[4].trim() : ''
                         };
-                    }).filter(item => item !== null && item.day);
+                    }).filter(item => item !== null && DAYS.includes(item.day)); // '요일'이 정확한 항목만 필터
                 };
 
                 if (nayoonRes.ok) newSchedules = [...newSchedules, ...(await processSheet(nayoonRes, '나윤', 'pink'))];
@@ -581,17 +608,25 @@
                     state.schedules = newSchedules;
                     document.getElementById('sync-status').textContent = '동기화 완료';
                 } else {
-                    throw new Error('No valid data');
+                    document.getElementById('sync-status').textContent = '데이터가 없거나 읽을 수 없습니다.';
                 }
 
             } catch (error) {
                 console.warn("구글 시트 연동 실패", error);
-                document.getElementById('sync-status').textContent = '동기화 실패 (기본 데이터)';
+                document.getElementById('sync-status').textContent = '에러: 시트 주소 또는 접근 권한을 확인하세요.';
+                // 실패 시 초기 모의데이터로 롤백 적용
+                if(state.schedules.length === 0){
+                     state.schedules = INITIAL_MOCK_DATA;
+                }
             } finally {
                 state.isSyncing = false;
                 document.querySelector('.sync-icon').classList.remove('animate-spin');
                 renderApp();
-                setTimeout(() => document.getElementById('sync-status').textContent = '', 3000);
+                setTimeout(() => {
+                   if(document.getElementById('sync-status').textContent === '동기화 완료'){
+                       document.getElementById('sync-status').textContent = '';
+                   }
+                }, 3000);
             }
         };
 
