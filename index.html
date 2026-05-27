@@ -201,7 +201,8 @@
 
         // --- 상태 변수 ---
         const SHEET_ID = '1ZbPazY46kzoGNB19Oq_JS51cFRYmY2qaN8IFz6Ypl_s';
-        const URL_PREFIX = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+        // 개선됨: 불안정한 csv 대신 확실하게 데이터 구조를 잡아주는 json 포맷 사용
+        const URL_PREFIX = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=`;
         
         const INITIAL_MOCK_DATA = [
             { id: 1, child: '나윤', day: '월요일', startTime: '18:00', endTime: '21:00', title: '학교', subject: '야간자습', color: 'pink' },
@@ -223,7 +224,7 @@
         const DAYS = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
 
         let state = {
-            schedules: [], // 초기 데이터를 비워서 실제 데이터를 로드하도록 변경
+            schedules: [], 
             viewMode: '통합',
             searchTerm: '',
             isDarkMode: false,
@@ -233,49 +234,39 @@
             editNotice: ''
         };
 
-        // --- 강력한 CSV 파서 (개선됨: 줄바꿈, 따옴표 완벽 처리) ---
-        const parseCSV = (str) => {
-            const result = [];
-            let row = [];
-            let cell = '';
-            let quote = false;
-            for (let i = 0; i < str.length; i++) {
-                let char = str[i], nextChar = str[i + 1];
-                
-                if (char === '"' && quote && nextChar === '"') {
-                    cell += '"';
-                    i++;
-                } else if (char === '"') {
-                    quote = !quote;
-                } else if (char === ',' && !quote) {
-                    row.push(cell.trim());
-                    cell = '';
-                } else if (char === '\n' && !quote) {
-                    row.push(cell.trim());
-                    result.push(row);
-                    row = [];
-                    cell = '';
-                } else if (char === '\r' && !quote) {
-                    if (nextChar !== '\n') {
-                        row.push(cell.trim());
-                        result.push(row);
-                        row = [];
-                        cell = '';
-                    }
-                } else {
-                    cell += char;
-                }
-            }
-            if (cell || row.length > 0) {
-                row.push(cell.trim());
-                result.push(row);
-            }
-            return result;
+        // --- 요일 텍스트 유연하게 처리 (ex: "월", "월요일 ", "월요" 모두 "월요일"로 자동 인식) ---
+        const normalizeDay = (d) => {
+            if (!d) return '';
+            const text = d.toString().trim();
+            if (text.includes('월')) return '월요일';
+            if (text.includes('화')) return '화요일';
+            if (text.includes('수')) return '수요일';
+            if (text.includes('목')) return '목요일';
+            if (text.includes('금')) return '금요일';
+            if (text.includes('토')) return '토요일';
+            if (text.includes('일')) return '일요일';
+            return '';
         };
 
         const getCurrentDayString = () => {
             const index = new Date().getDay();
             return index === 0 ? '일요일' : DAYS[index - 1];
+        };
+
+        // --- 구글 시트 JSON 추출 헬퍼 함수 ---
+        const fetchJsonFromGviz = async (url) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('네트워크 응답 오류');
+            const text = await res.text();
+            
+            // gviz 응답은 google.visualization.Query.setResponse({...}) 형태이므로 JSON만 정규식으로 추출
+            const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
+            if (match && match[1]) {
+                const json = JSON.parse(match[1]);
+                if (json.status === 'error') throw new Error(json.errors[0].message);
+                return json.table;
+            }
+            throw new Error('올바르지 않은 데이터 형식');
         };
 
         // --- 렌더링 함수 ---
@@ -337,7 +328,7 @@
                     state.editNotice = '';
                 });
 
-                // 구글 앱스 스크립트로 저장 요청 보내기 (빈 값 저장=삭제 도 가능)
+                // 구글 앱스 스크립트로 저장 요청 보내기
                 document.getElementById('btn-save-notice').addEventListener('click', async () => {
                     const newNotice = state.editNotice;
                     const btn = document.getElementById('btn-save-notice');
@@ -480,8 +471,8 @@
 
                 const itemsHtml = daySchedules.map(schedule => {
                     const itemBg = schedule.color === 'pink'
-                        ? 'bg-white border-pink-100 dark:bg-slate-800 dark:border-pink-900/50'
-                        : 'bg-white border-blue-100 dark:bg-slate-800 dark:border-blue-900/50';
+                        ? 'bg-pink-50 border-pink-200 dark:bg-pink-900/30 dark:border-pink-800/50'
+                        : 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800/50';
                     const timeColor = schedule.color === 'pink' ? 'text-pink-500 dark:text-pink-400' : 'text-blue-500 dark:text-blue-400';
                     const dotClass = schedule.color === 'pink' ? 'bg-pink-400' : 'bg-blue-400';
 
@@ -548,7 +539,7 @@
             lucide.createIcons(); // DOM 갱신 후 아이콘 재생성
         };
 
-        // --- 구글 시트 동기화 로직 (개선됨: 한글 시트명 인코딩) ---
+        // --- 구글 시트 데이터 동기화 (개선된 JSON 방식) ---
         const fetchSheetData = async () => {
             if (state.isSyncing) return;
             state.isSyncing = true;
@@ -556,64 +547,97 @@
             document.querySelector('.sync-icon').classList.add('animate-spin');
             
             try {
-                // 1. 설정 (시트명 인코딩 필수)
-                const settingsRes = await fetch(URL_PREFIX + encodeURIComponent('설정'));
-                if (settingsRes.ok) {
-                    const settingsCsv = await settingsRes.text();
-                    const settingsData = parseCSV(settingsCsv);
-                    if (settingsData.length > 1) {
-                        state.settings = {
-                            password: settingsData[1][0] || '1234',
-                            notice: settingsData[1][1] || ''
+                // 1. 설정 탭 로드
+                try {
+                    const settingsTable = await fetchJsonFromGviz(URL_PREFIX + encodeURIComponent('설정'));
+                    if (settingsTable && settingsTable.rows && settingsTable.rows.length > 0) {
+                        // 헤더가 있는 경우를 대비해 첫 번째 데이터 행을 가져옴
+                        const row = settingsTable.rows[0]; 
+                        const getCell = (colIdx) => {
+                            if (!row.c || !row.c[colIdx]) return '';
+                            const cell = row.c[colIdx];
+                            if (cell.f !== undefined && cell.f !== null) return cell.f.toString().trim();
+                            if (cell.v === null || cell.v === undefined) return '';
+                            return cell.v.toString().trim();
                         };
+                        
+                        state.settings.password = getCell(0) || '1234'; // A2
+                        state.settings.notice = getCell(1) || ''; // B2
                         if(!state.isEditMode) state.editNotice = state.settings.notice;
                     }
+                } catch (e) {
+                    console.warn("설정 탭을 읽어오는데 실패했습니다 (기본값 유지)", e);
                 }
 
-                // 2. 나윤, 태윤 (시트명 인코딩 필수)
-                const [nayoonRes, taeyoonRes] = await Promise.all([
-                    fetch(URL_PREFIX + encodeURIComponent('나윤')),
-                    fetch(URL_PREFIX + encodeURIComponent('태윤'))
-                ]);
-
-                let newSchedules = [];
-
-                const processSheet = async (res, childName, color) => {
-                    if (!res.ok) throw new Error('Network response was not ok');
-                    const csv = await res.text();
-                    // 구글 시트 비공개 등 에러로 HTML을 반환할 때 방어
-                    if (csv.trim().startsWith('<')) throw new Error('시트 접근 권한 에러');
+                // 2. 스케줄 탭 로드
+                const processSheet = async (childName, color) => {
+                    const table = await fetchJsonFromGviz(URL_PREFIX + encodeURIComponent(childName));
+                    if (!table || !table.rows) return [];
                     
-                    const data = parseCSV(csv);
-                    return data.slice(1).map((row, index) => {
-                        // 유효성 검사 강화
-                        if (!row || row.length < 2 || !row[0]) return null;
+                    return table.rows.map((row, index) => {
+                        // row.c 구조에서 안전하게 텍스트 값 추출 (포맷된 값 우선)
+                        const getCell = (colIdx) => {
+                            if (!row.c || !row.c[colIdx]) return '';
+                            const cell = row.c[colIdx];
+                            
+                            // 구글 시트에 보이는 포맷팅된 문자열(f) 우선 사용
+                            if (cell.f !== undefined && cell.f !== null) {
+                                return cell.f.toString().trim();
+                            }
+                            
+                            // 원본 데이터(v) 사용
+                            if (cell.v === null || cell.v === undefined) return '';
+                            let val = cell.v.toString().trim();
+                            
+                            // 구글 시트의 내부 Date 포맷을 시:분 형태로 자동 보정
+                            if (val.startsWith('Date(')) {
+                                const match = val.match(/Date\((\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/);
+                                if (match) {
+                                    const h = match[4].padStart(2, '0');
+                                    const m = match[5].padStart(2, '0');
+                                    return `${h}:${m}`;
+                                }
+                            }
+                            return val;
+                        };
+
+                        const rawDay = getCell(0);
+                        const day = normalizeDay(rawDay); // 요일 자동 인식
+
+                        if (!day) return null; // 요일 정보가 없으면 무시
+
                         return {
                             id: `${childName}-${index}`, 
                             child: childName, 
                             color: color,
-                            day: row[0] ? row[0].trim() : '', 
-                            startTime: row[1] ? row[1].trim() : '', 
-                            endTime: row[2] ? row[2].trim() : '', 
-                            title: row[3] ? row[3].trim() : '', 
-                            subject: row[4] ? row[4].trim() : ''
+                            day: day, 
+                            startTime: getCell(1) || '00:00', 
+                            endTime: getCell(2) || '00:00', 
+                            title: getCell(3) || '일정', 
+                            subject: getCell(4) || ''
                         };
-                    }).filter(item => item !== null && DAYS.includes(item.day)); // '요일'이 정확한 항목만 필터
+                    }).filter(item => item !== null);
                 };
 
-                if (nayoonRes.ok) newSchedules = [...newSchedules, ...(await processSheet(nayoonRes, '나윤', 'pink'))];
-                if (taeyoonRes.ok) newSchedules = [...newSchedules, ...(await processSheet(taeyoonRes, '태윤', 'blue'))];
+                const [nayoonData, taeyoonData] = await Promise.allSettled([
+                    processSheet('나윤', 'pink'),
+                    processSheet('태윤', 'blue')
+                ]);
+
+                let newSchedules = [];
+                if (nayoonData.status === 'fulfilled') newSchedules.push(...nayoonData.value);
+                if (taeyoonData.status === 'fulfilled') newSchedules.push(...taeyoonData.value);
 
                 if (newSchedules.length > 0) {
                     state.schedules = newSchedules;
                     document.getElementById('sync-status').textContent = '동기화 완료';
                 } else {
-                    document.getElementById('sync-status').textContent = '데이터가 없거나 읽을 수 없습니다.';
+                    document.getElementById('sync-status').textContent = '데이터가 비어있습니다.';
                 }
 
             } catch (error) {
-                console.warn("구글 시트 연동 실패", error);
-                document.getElementById('sync-status').textContent = '에러: 시트 주소 또는 접근 권한을 확인하세요.';
+                console.warn("구글 시트 연동 에러:", error);
+                document.getElementById('sync-status').textContent = '에러: 시트 주소 또는 형식을 확인하세요.';
                 // 실패 시 초기 모의데이터로 롤백 적용
                 if(state.schedules.length === 0){
                      state.schedules = INITIAL_MOCK_DATA;
