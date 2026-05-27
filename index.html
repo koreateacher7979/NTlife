@@ -94,7 +94,7 @@
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
-                    실시간 일정 추적 활성화
+                    실시간 일정 추적 활성화 (자동동기화 중)
                 </div>
             </div>
 
@@ -517,17 +517,24 @@
             lucide.createIcons();
         };
 
-        // --- 구글 시트 데이터 동기화 (개선된 JSON 방식 및 Row 식별자 추가) ---
-        const fetchSheetData = async () => {
+        // --- 구글 시트 데이터 동기화 (개선된 JSON 방식, 캐시 무력화 및 Background 동기화 추가) ---
+        const fetchSheetData = async (isBackground = false) => {
             if (state.isSyncing) return;
             state.isSyncing = true;
-            document.getElementById('sync-status').textContent = '데이터 불러오는 중...';
-            document.querySelector('.sync-icon').classList.add('animate-spin');
+            
+            // 사용자가 수동 갱신할 때만 UI에 동기화 중 표시
+            if (!isBackground) {
+                document.getElementById('sync-status').textContent = '데이터 불러오는 중...';
+                document.querySelector('.sync-icon').classList.add('animate-spin');
+            }
             
             try {
+                // 강력한 캐시 방지(Cache Buster)를 위해 타임스탬프 추가
+                const timestamp = new Date().getTime();
+
                 // 1. 설정 탭 로드
                 try {
-                    const settingsTable = await fetchJsonFromGviz(URL_PREFIX + encodeURIComponent('설정'));
+                    const settingsTable = await fetchJsonFromGviz(`${URL_PREFIX}${encodeURIComponent('설정')}&_=${timestamp}`);
                     if (settingsTable && settingsTable.rows && settingsTable.rows.length > 0) {
                         const row = settingsTable.rows[0]; 
                         const getCell = (colIdx) => {
@@ -545,7 +552,7 @@
 
                 // 2. 스케줄 탭 로드
                 const processSheet = async (childName, color) => {
-                    const table = await fetchJsonFromGviz(URL_PREFIX + encodeURIComponent(childName));
+                    const table = await fetchJsonFromGviz(`${URL_PREFIX}${encodeURIComponent(childName)}&_=${timestamp}`);
                     if (!table || !table.rows) return [];
                     
                     return table.rows.map((row, index) => {
@@ -592,16 +599,24 @@
                 if (taeyoonData.status === 'fulfilled') newSchedules.push(...taeyoonData.value);
 
                 state.schedules = newSchedules;
-                document.getElementById('sync-status').textContent = '동기화 완료';
+                if (!isBackground) document.getElementById('sync-status').textContent = '동기화 완료';
 
             } catch (error) {
                 console.warn("구글 시트 연동 에러:", error);
-                document.getElementById('sync-status').textContent = '에러: 시트 주소 확인';
+                if (!isBackground) document.getElementById('sync-status').textContent = '에러: 시트 주소 확인';
             } finally {
                 state.isSyncing = false;
-                document.querySelector('.sync-icon').classList.remove('animate-spin');
+                if (!isBackground) document.querySelector('.sync-icon').classList.remove('animate-spin');
                 renderApp();
-                setTimeout(() => { if(document.getElementById('sync-status').textContent === '동기화 완료') document.getElementById('sync-status').textContent = ''; }, 3000);
+                
+                if (!isBackground) {
+                    setTimeout(() => { 
+                        const statusEl = document.getElementById('sync-status');
+                        if(statusEl.textContent === '동기화 완료' || statusEl.textContent.includes('에러')) {
+                            statusEl.textContent = ''; 
+                        }
+                    }, 3000);
+                }
             }
         };
 
@@ -664,7 +679,7 @@
             try {
                 await sendGasRequest('deleteSchedule', { child: schedule.child, rowIndex: schedule.rowIndex });
                 alert('성공적으로 삭제되었습니다.');
-                await fetchSheetData(); // 삭제 후 즉시 데이터 재동기화
+                await fetchSheetData(false); // 삭제 후 즉시 데이터 재동기화
             } catch (e) {
                 alert('삭제 실패: ' + e.message);
                 document.getElementById('sync-status').textContent = '삭제 오류';
@@ -682,8 +697,8 @@
                 document.getElementById('clock-s').textContent = `:${String(now.getSeconds()).padStart(2, '0')}`;
             }, 1000);
 
-            // 기본 이벤트
-            document.getElementById('btn-sync').addEventListener('click', fetchSheetData);
+            // 기본 이벤트 (수동 새로고침)
+            document.getElementById('btn-sync').addEventListener('click', () => fetchSheetData(false));
             document.getElementById('btn-darkmode').addEventListener('click', () => {
                 state.isDarkMode = !state.isDarkMode;
                 document.documentElement.classList.toggle('dark', state.isDarkMode);
@@ -733,7 +748,7 @@
                     await sendGasRequest(mode === 'edit' ? 'editSchedule' : 'addSchedule', payload);
                     scheduleModal.classList.add('hidden');
                     alert(`일정이 성공적으로 ${mode === 'edit' ? '수정' : '추가'}되었습니다.`);
-                    await fetchSheetData(); // 저장 후 즉시 재동기화
+                    await fetchSheetData(false); // 저장 후 즉시 재동기화
                 } catch (err) {
                     alert('저장 실패: ' + err.message);
                 } finally {
@@ -742,7 +757,17 @@
                 }
             });
 
-            fetchSheetData();
+            // --- 자동 실시간 동기화 폴링 (10초 주기) ---
+            setInterval(() => {
+                // 부모님이 편집 모드로 타이핑 중이거나 모달이 열려있을 때는 방해하지 않도록 스킵
+                const isScheduleModalOpen = !document.getElementById('schedule-modal').classList.contains('hidden');
+                if (!state.isEditMode && !isScheduleModalOpen) {
+                    fetchSheetData(true); // true = 백그라운드 조용히 실행
+                }
+            }, 10000);
+
+            // 최초 화면 로드 시 실행
+            fetchSheetData(false);
         };
 
         document.addEventListener('DOMContentLoaded', init);
