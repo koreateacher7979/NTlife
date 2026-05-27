@@ -24,20 +24,23 @@
     <!-- Lucide Icons (CDN) -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- 커스텀 스타일 (스크롤바, 폰트, 애니메이션) -->
+    <!-- 커스텀 스타일 -->
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         body { font-family: 'Pretendard', sans-serif; }
         .marquee-container { overflow: hidden; white-space: nowrap; width: 100%; position: relative; }
         .marquee-content { display: inline-block; animation: marquee 20s linear infinite; padding-left: 100%; }
         @keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
-        /* 스크롤바 숨기기 (가로/세로) */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 모달 오버레이 애니메이션 */
+        .modal-enter { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; backdrop-filter: blur(0px); } to { opacity: 1; backdrop-filter: blur(4px); } }
     </style>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-white transition-colors duration-300">
@@ -78,13 +81,10 @@
         
         <!-- 좌측 패널 -->
         <aside class="w-full lg:w-[320px] flex flex-col gap-4 sm:gap-6 flex-shrink-0">
-            
             <!-- 디지털 시계 -->
             <div class="bg-[#1e2335] text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-pink-400"></div>
-                <div id="clock-date" class="text-slate-300 text-sm sm:text-base font-medium mb-1">
-                    <!-- 날짜 들어갈 곳 -->
-                </div>
+                <div id="clock-date" class="text-slate-300 text-sm sm:text-base font-medium mb-1"></div>
                 <div class="text-4xl sm:text-5xl font-black tracking-wider mb-2 font-mono flex items-baseline gap-2">
                     <span id="clock-hm">00:00</span>
                     <span id="clock-s" class="text-xl sm:text-2xl text-slate-400 font-bold">:00</span>
@@ -100,7 +100,7 @@
 
             <!-- 미니 전광판 -->
             <div id="marquee-container" class="rounded-3xl p-5 shadow-sm border-2 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 transition-all">
-                <!-- 자바스크립트로 렌더링 됨 -->
+                <!-- 렌더링 영역 -->
             </div>
 
             <!-- 오늘의 학원 일정 -->
@@ -115,43 +115,33 @@
                     </span>
                 </div>
                 <div id="today-schedules" class="flex flex-col gap-3">
-                    <!-- 자바스크립트로 렌더링 됨 -->
+                    <!-- 렌더링 영역 -->
                 </div>
             </div>
         </aside>
 
         <!-- 우측 메인 패널 -->
         <section class="flex-1 flex flex-col min-w-0">
-            
             <!-- 컨트롤 바 -->
             <div class="mb-6 flex flex-col sm:flex-row justify-between gap-4 p-2 rounded-2xl bg-white shadow-sm border border-slate-100 dark:bg-slate-800 dark:border-slate-700">
                 <div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-x-auto hide-scrollbar" id="view-filters">
-                    <button data-view="통합" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-400">
-                        <i data-lucide="users" class="w-[18px] h-[18px]"></i> 형제 통합 뷰
-                    </button>
-                    <button data-view="나윤" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600">
-                        <i data-lucide="user" class="w-[18px] h-[18px]"></i> 나윤 (딸)
-                    </button>
-                    <button data-view="태윤" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600">
-                        <i data-lucide="user" class="w-[18px] h-[18px]"></i> 태윤 (아들)
-                    </button>
+                    <!-- 탭 렌더링 영역 -->
                 </div>
 
-                <div class="relative flex-1 sm:max-w-xs px-2 sm:px-0 flex items-center">
-                    <i data-lucide="search" class="absolute left-5 sm:left-3 text-slate-400 w-[18px] h-[18px]"></i>
-                    <input 
-                        type="text" 
-                        id="search-input"
-                        placeholder="학원 또는 과목 검색..." 
-                        class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-all bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
-                    />
+                <div class="relative flex-1 sm:max-w-xs px-2 sm:px-0 flex items-center gap-2" id="control-actions">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-5 sm:left-3 top-[50%] -translate-y-[50%] text-slate-400 w-[18px] h-[18px]"></i>
+                        <input type="text" id="search-input" placeholder="학원 또는 과목 검색..." class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-all bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:focus:border-indigo-500 dark:focus:ring-indigo-900" />
+                    </div>
+                    <!-- 일정 추가 버튼 영역 -->
+                    <div id="add-schedule-btn-container"></div>
                 </div>
             </div>
 
             <!-- 주간 스케줄 그리드 -->
             <div class="flex-1 overflow-x-auto pb-4 hide-scrollbar">
                 <div id="weekly-grid" class="flex gap-4 min-w-[900px] h-full items-stretch">
-                    <!-- 자바스크립트로 렌더링 됨 -->
+                    <!-- 렌더링 영역 -->
                 </div>
             </div>
         </section>
@@ -163,64 +153,94 @@
         <p class="mt-1">© 2026 Valued Future Education Lab. All Rights Reserved.</p>
     </footer>
 
-    <!-- 부모 인증 모달 (숨김 기본값) -->
+    <!-- 부모 인증 모달 -->
     <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity hidden">
         <div class="w-full max-w-sm rounded-3xl p-6 shadow-2xl relative bg-white dark:bg-slate-800">
-            <button id="close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
-                <i data-lucide="x" class="w-6 h-6"></i>
-            </button>
+            <button id="close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
             <div class="text-center mb-6">
-                <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-indigo-900/50 dark:text-indigo-400">
-                    <i data-lucide="lock" class="w-8 h-8"></i>
-                </div>
+                <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-indigo-900/50 dark:text-indigo-400"><i data-lucide="lock" class="w-8 h-8"></i></div>
                 <h2 class="text-xl font-black mb-1">부모 인증</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400">설정 시트에 등록된 비밀번호를 입력하세요.</p>
             </div>
-            
             <form id="auth-form">
-                <input 
-                    type="password" 
-                    id="password-input"
-                    placeholder="비밀번호 입력"
-                    class="w-full text-center tracking-widest text-lg p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-4 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:focus:ring-indigo-900"
-                />
-                <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95">
-                    인증 및 편집 모드 진입
-                </button>
+                <input type="password" id="password-input" placeholder="비밀번호 입력" class="w-full text-center tracking-widest text-lg p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-4 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:focus:ring-indigo-900" />
+                <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95">인증 및 편집 모드 진입</button>
             </form>
-            <p class="text-xs text-center text-slate-400 mt-4 flex items-center justify-center gap-1">
-                <i data-lucide="alert-circle" class="w-3 h-3"></i> 구글시트 "설정" 탭의 A2 셀 값입니다.
-            </p>
+        </div>
+    </div>
+
+    <!-- 스케줄 추가/수정 모달 -->
+    <div id="schedule-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 modal-enter hidden">
+        <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl relative bg-white dark:bg-slate-800">
+            <button id="close-schedule-modal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            <div class="mb-5">
+                <h2 id="schedule-modal-title" class="text-xl font-black mb-1 flex items-center gap-2 text-slate-800 dark:text-white">
+                    <i data-lucide="calendar-plus" class="w-6 h-6 text-indigo-500"></i> 일정 추가
+                </h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">새로운 일정을 등록하거나 수정합니다.</p>
+            </div>
+            <form id="schedule-form" class="space-y-4">
+                <input type="hidden" id="sch-old-child">
+                <input type="hidden" id="sch-row-index">
+                <input type="hidden" id="sch-mode" value="add">
+                
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">자녀</label>
+                        <select id="sch-child" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                            <option value="나윤">나윤 (딸)</option>
+                            <option value="태윤">태윤 (아들)</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">요일</label>
+                        <select id="sch-day" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                            <option value="월요일">월요일</option>
+                            <option value="화요일">화요일</option>
+                            <option value="수요일">수요일</option>
+                            <option value="목요일">목요일</option>
+                            <option value="금요일">금요일</option>
+                            <option value="토요일">토요일</option>
+                            <option value="일요일">일요일</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">시작 시간</label>
+                        <input type="time" id="sch-start" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">종료 시간</label>
+                        <input type="time" id="sch-end" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">학원명 / 일정명</label>
+                    <input type="text" id="sch-title" required placeholder="예: 옥수학" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">과목 / 세부내용</label>
+                    <input type="text" id="sch-subject" required placeholder="예: 수학, 심야자습 등" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                </div>
+                <div class="pt-2">
+                    <button type="submit" id="btn-submit-schedule" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i data-lucide="check" class="w-4 h-4"></i> 저장하기
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- 스크립트 로직 -->
     <script>
         // --- ★ Apps Script 연동 URL (배포 후 얻은 주소를 여기에 붙여넣으세요) ★ ---
-        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwCWmMvpRwM-i9MMJI9BXw6T7ywai-F_y_jDC3Ol_3nYcT7p_SG5hgOmeJE8Jkc26NG/exec'; 
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx1p8Px_Qj_rch5sgpODwS7bDrziACabTJEQ90bT7oFi75-Zve6HzcZLiC9lPrVmDRf/exec'; 
 
         // --- 상태 변수 ---
         const SHEET_ID = '1ZbPazY46kzoGNB19Oq_JS51cFRYmY2qaN8IFz6Ypl_s';
-        // 개선됨: 불안정한 csv 대신 확실하게 데이터 구조를 잡아주는 json 포맷 사용
         const URL_PREFIX = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=`;
         
-        const INITIAL_MOCK_DATA = [
-            { id: 1, child: '나윤', day: '월요일', startTime: '18:00', endTime: '21:00', title: '학교', subject: '야간자습', color: 'pink' },
-            { id: 2, child: '태윤', day: '월요일', startTime: '19:00', endTime: '22:00', title: '봉국어', subject: '국어', color: 'blue' },
-            { id: 3, child: '나윤', day: '화요일', startTime: '16:30', endTime: '19:00', title: '옥수학', subject: '수학', color: 'pink' },
-            { id: 4, child: '태윤', day: '화요일', startTime: '18:00', endTime: '22:25', title: '학교', subject: '심야자습', color: 'blue' },
-            { id: 5, child: '나윤', day: '수요일', startTime: '18:00', endTime: '21:00', title: '학교', subject: '야간자습', color: 'pink' },
-            { id: 6, child: '태윤', day: '수요일', startTime: '19:00', endTime: '22:00', title: '봉국어', subject: '국어', color: 'blue' },
-            { id: 7, child: '나윤', day: '목요일', startTime: '18:30', endTime: '20:40', title: '손샘', subject: '영어', color: 'pink' },
-            { id: 8, child: '태윤', day: '목요일', startTime: '19:00', endTime: '22:00', title: '영어', subject: '일등', color: 'blue' },
-            { id: 9, child: '나윤', day: '금요일', startTime: '16:30', endTime: '19:00', title: '옥수학', subject: '수학', color: 'pink' },
-            { id: 10, child: '태윤', day: '금요일', startTime: '18:00', endTime: '22:25', title: '학교', subject: '심야자습', color: 'blue' },
-            { id: 11, child: '태윤', day: '토요일', startTime: '09:30', endTime: '12:00', title: '수학', subject: '디오수', color: 'blue' },
-            { id: 12, child: '나윤', day: '토요일', startTime: '13:00', endTime: '16:00', title: '수학', subject: '디오수', color: 'pink' },
-            { id: 13, child: '태윤', day: '토요일', startTime: '15:30', endTime: '20:00', title: '옥수학', subject: '수학', color: 'blue' },
-            { id: 14, child: '나윤', day: '일요일', startTime: '13:00', endTime: '15:30', title: '국어', subject: '인사이트', color: 'pink' },
-            { id: 15, child: '태윤', day: '일요일', startTime: '19:00', endTime: '21:00', title: '영어', subject: '일등', color: 'blue' },
-        ];
         const DAYS = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
 
         let state = {
@@ -234,7 +254,6 @@
             editNotice: ''
         };
 
-        // --- 요일 텍스트 유연하게 처리 (ex: "월", "월요일 ", "월요" 모두 "월요일"로 자동 인식) ---
         const normalizeDay = (d) => {
             if (!d) return '';
             const text = d.toString().trim();
@@ -253,13 +272,10 @@
             return index === 0 ? '일요일' : DAYS[index - 1];
         };
 
-        // --- 구글 시트 JSON 추출 헬퍼 함수 ---
         const fetchJsonFromGviz = async (url) => {
             const res = await fetch(url);
             if (!res.ok) throw new Error('네트워크 응답 오류');
             const text = await res.text();
-            
-            // gviz 응답은 google.visualization.Query.setResponse({...}) 형태이므로 JSON만 정규식으로 추출
             const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
             if (match && match[1]) {
                 const json = JSON.parse(match[1]);
@@ -302,19 +318,16 @@
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="font-bold text-sm flex items-center gap-2">
-                            <i data-lucide="megaphone" class="text-indigo-500 w-4 h-4"></i> 부모님 전달사항
+                            <i data-lucide="megaphone" class="text-indigo-500 w-4 h-4"></i> 전달사항 편집
                         </h3>
                         <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">편집 중</span>
                     </div>
                     <div class="flex flex-col gap-3">
-                        <textarea id="notice-textarea" class="w-full text-sm p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-400 outline-none resize-none h-24 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="아이들에게 전달할 메시지를 입력하세요."></textarea>
-                        
+                        <textarea id="notice-textarea" class="w-full text-sm p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-400 outline-none resize-none h-20 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="아이들에게 전달할 메시지를 입력하세요."></textarea>
                         <div class="flex gap-2">
-                            <button id="btn-delete-notice" class="flex-1 bg-red-50 text-red-600 text-sm font-bold py-2 rounded-xl border border-red-100 hover:bg-red-100 flex items-center justify-center gap-1 transition-all dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/40">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i> 지우기
-                            </button>
+                            <button id="btn-delete-notice" class="flex-1 bg-slate-100 text-slate-600 text-sm font-bold py-2 rounded-xl hover:bg-slate-200 flex items-center justify-center gap-1 transition-all dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">지우기</button>
                             <button id="btn-save-notice" class="flex-[2] bg-indigo-600 text-white text-sm font-bold py-2 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-1 disabled:opacity-70 disabled:cursor-not-allowed transition-all">
-                                <i data-lucide="check" class="w-4 h-4"></i> 저장하기
+                                <i data-lucide="check" class="w-4 h-4"></i> 공지 저장
                             </button>
                         </div>
                     </div>
@@ -322,60 +335,20 @@
                 document.getElementById('notice-textarea').value = state.editNotice;
                 document.getElementById('notice-textarea').addEventListener('input', (e) => state.editNotice = e.target.value);
                 
-                // 내용 지우기 버튼 (삭제)
                 document.getElementById('btn-delete-notice').addEventListener('click', () => {
                     document.getElementById('notice-textarea').value = '';
                     state.editNotice = '';
                 });
 
-                // 구글 앱스 스크립트로 저장 요청 보내기
                 document.getElementById('btn-save-notice').addEventListener('click', async () => {
-                    const newNotice = state.editNotice;
                     const btn = document.getElementById('btn-save-notice');
-                    const originalBtnHtml = btn.innerHTML;
-                    
-                    if (GAS_WEB_APP_URL === '여기에_배포된_웹앱_URL을_입력하세요' || !GAS_WEB_APP_URL) {
-                        alert('구글 앱스 스크립트 웹앱 URL이 설정되지 않았습니다. 현재 화면에만 임시로 반영됩니다.');
-                        state.settings.notice = newNotice;
-                        state.isEditMode = false;
-                        renderApp();
-                        return;
-                    }
-
                     btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 저장 중...`;
-                    btn.disabled = true;
-                    lucide.createIcons();
-
-                    try {
-                        const formData = new URLSearchParams();
-                        formData.append('action', 'updateNotice');
-                        formData.append('notice', newNotice);
-                        formData.append('password', state.settings.password);
-
-                        const response = await fetch(GAS_WEB_APP_URL, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        const result = await response.json();
-
-                        if (result.result === 'success') {
-                            state.settings.notice = newNotice;
-                            state.isEditMode = false;
-                            alert('전달사항이 구글 시트에 성공적으로 저장되었습니다!');
-                            renderApp();
-                        } else {
-                            alert('저장 실패: ' + result.message);
-                            btn.innerHTML = originalBtnHtml;
-                            btn.disabled = false;
-                            lucide.createIcons();
-                        }
-                    } catch (error) {
-                        console.error(error);
-                        alert('네트워크 오류가 발생하여 저장하지 못했습니다.');
-                        btn.innerHTML = originalBtnHtml;
-                        btn.disabled = false;
-                        lucide.createIcons();
-                    }
+                    btn.disabled = true; lucide.createIcons();
+                    await sendGasRequest('updateNotice', { notice: state.editNotice });
+                    state.settings.notice = state.editNotice;
+                    alert('전달사항이 저장되었습니다.');
+                    btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> 공지 저장`;
+                    btn.disabled = false; lucide.createIcons();
                 });
             } else {
                 container.className = "rounded-3xl p-5 shadow-sm border-2 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 transition-all";
@@ -394,39 +367,76 @@
             }
         };
 
+        const renderFiltersAndActions = () => {
+            const container = document.getElementById('view-filters');
+            container.innerHTML = ['통합', '나윤', '태윤'].map(view => {
+                const isActive = state.viewMode === view;
+                const activeClass = isActive ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-400" : "text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600";
+                const label = view === '통합' ? '형제 통합 뷰' : `${view} ${view==='나윤'?'(딸)':'(아들)'}`;
+                const icon = view === '통합' ? 'users' : 'user';
+                return `<button data-view="${view}" class="filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap ${activeClass}">
+                    <i data-lucide="${icon}" class="w-[18px] h-[18px]"></i> ${label}
+                </button>`;
+            }).join('');
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.viewMode = e.currentTarget.dataset.view;
+                    renderApp();
+                });
+            });
+
+            // 일정 추가 버튼 (편집 모드일 때만 표시)
+            const addBtnContainer = document.getElementById('add-schedule-btn-container');
+            if (state.isEditMode) {
+                addBtnContainer.innerHTML = `
+                    <button id="btn-add-schedule" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm flex items-center gap-1.5 transition-all shadow-md whitespace-nowrap">
+                        <i data-lucide="plus" class="w-4 h-4"></i> 일정 추가
+                    </button>
+                `;
+                document.getElementById('btn-add-schedule').addEventListener('click', () => openScheduleModal());
+            } else {
+                addBtnContainer.innerHTML = '';
+            }
+        };
+
         const generateChildBadge = (child, color) => {
-            const colorClass = color === 'pink' 
-                ? 'bg-pink-100 text-pink-600 dark:bg-pink-900/50 dark:text-pink-300' 
-                : 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300';
+            const colorClass = color === 'pink' ? 'bg-pink-100 text-pink-600 dark:bg-pink-900/50 dark:text-pink-300' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300';
             return `<span class="px-2 py-0.5 rounded-full text-xs font-bold ${colorClass}">${child}</span>`;
+        };
+
+        // 블럭 우측 상단 수정/삭제 버튼 생성
+        const generateEditControls = (schedule) => {
+            if (!state.isEditMode) return '';
+            return `
+                <div class="absolute top-2 right-2 flex gap-1 bg-white/80 dark:bg-slate-800/80 rounded px-1 backdrop-blur-sm shadow-sm border border-slate-100 dark:border-slate-700 z-10">
+                    <button onclick="editSchedule('${schedule.id}')" class="p-1 text-slate-400 hover:text-indigo-600 transition-colors" title="수정"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
+                    <button onclick="deleteSchedule('${schedule.id}')" class="p-1 text-slate-400 hover:text-red-600 transition-colors" title="삭제"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                </div>
+            `;
         };
 
         const renderToday = () => {
             const todayStr = getCurrentDayString();
-            const todaySchedules = state.schedules
-                .filter(s => s.day === todayStr)
-                .sort((a, b) => a.startTime.localeCompare(b.startTime));
-
+            const todaySchedules = state.schedules.filter(s => s.day === todayStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
             document.getElementById('today-count').textContent = `${todaySchedules.length}개`;
             
             const container = document.getElementById('today-schedules');
             if (todaySchedules.length > 0) {
                 container.innerHTML = todaySchedules.map(schedule => {
-                    const bgClass = schedule.color === 'pink'
-                        ? 'bg-pink-50/50 border-pink-100 dark:bg-pink-900/20 dark:border-pink-800/50'
-                        : 'bg-blue-50/50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800/50';
-                    const textClass = schedule.color === 'pink' ? 'text-pink-600 dark:text-pink-400' : 'text-blue-600 dark:text-blue-400';
-
+                    const bgClass = schedule.color === 'pink' ? 'bg-pink-50 border-pink-200 dark:bg-pink-900/30 dark:border-pink-800/50' : 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800/50';
+                    const textClass = schedule.color === 'pink' ? 'text-pink-500 dark:text-pink-400' : 'text-blue-500 dark:text-blue-400';
                     return `
-                        <div class="p-4 rounded-2xl border flex flex-col gap-2 transition-transform hover:scale-[1.02] ${bgClass}">
-                            <div class="flex justify-between items-center">
+                        <div class="relative p-4 rounded-2xl border flex flex-col gap-2 transition-transform hover:scale-[1.02] shadow-sm ${bgClass}">
+                            ${generateEditControls(schedule)}
+                            <div class="flex justify-between items-center pr-12">
                                 <span class="text-sm font-bold flex items-center gap-1.5 ${textClass}">
                                     ${schedule.startTime} <span class="text-slate-300 dark:text-slate-600 text-xs">→</span> ${schedule.endTime}
                                 </span>
                                 ${generateChildBadge(schedule.child, schedule.color)}
                             </div>
                             <div>
-                                <h4 class="text-lg font-black">${schedule.title}</h4>
+                                <h4 class="text-lg font-black pr-12">${schedule.title}</h4>
                                 <p class="text-xs font-bold mt-1 flex items-center gap-1 text-slate-500 dark:text-slate-400">
                                     <span class="text-[10px]">📚</span> ${schedule.subject}
                                 </p>
@@ -437,8 +447,7 @@
             } else {
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center py-10 text-slate-400">
-                        <i data-lucide="calendar" class="w-10 h-10 mb-2 opacity-50"></i>
-                        <p class="text-sm font-medium">오늘은 일정이 없습니다. 휴식! 🏖️</p>
+                        <i data-lucide="calendar" class="w-10 h-10 mb-2 opacity-50"></i><p class="text-sm font-medium">오늘은 일정이 없습니다.</p>
                     </div>
                 `;
             }
@@ -454,37 +463,27 @@
 
             const container = document.getElementById('weekly-grid');
             container.innerHTML = DAYS.map(day => {
-                const daySchedules = filtered
-                    .filter(s => s.day === day)
-                    .sort((a, b) => a.startTime.localeCompare(b.startTime));
-                
+                const daySchedules = filtered.filter(s => s.day === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
                 const isToday = day === todayStr;
-                const wrapperClass = isToday 
-                    ? 'ring-4 ring-indigo-500/20 shadow-lg scale-[1.02] bg-white dark:bg-indigo-900/30' 
-                    : 'bg-white shadow-sm dark:bg-slate-800';
-                
-                const headerClass = isToday
-                    ? 'border-indigo-100 bg-indigo-50/50 dark:border-indigo-900/50 dark:bg-indigo-900/50'
-                    : 'border-slate-50 dark:border-slate-700';
-
+                const wrapperClass = isToday ? 'ring-4 ring-indigo-500/20 shadow-lg scale-[1.02] bg-white dark:bg-indigo-900/30' : 'bg-white shadow-sm dark:bg-slate-800';
+                const headerClass = isToday ? 'border-indigo-100 bg-indigo-50/50 dark:border-indigo-900/50 dark:bg-indigo-900/50' : 'border-slate-50 dark:border-slate-700';
                 const titleClass = isToday ? 'text-indigo-600 dark:text-indigo-400' : '';
 
                 const itemsHtml = daySchedules.map(schedule => {
-                    const itemBg = schedule.color === 'pink'
-                        ? 'bg-pink-50 border-pink-200 dark:bg-pink-900/30 dark:border-pink-800/50'
-                        : 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800/50';
+                    const itemBg = schedule.color === 'pink' ? 'bg-pink-50 border-pink-200 dark:bg-pink-900/30 dark:border-pink-800/50' : 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800/50';
                     const timeColor = schedule.color === 'pink' ? 'text-pink-500 dark:text-pink-400' : 'text-blue-500 dark:text-blue-400';
                     const dotClass = schedule.color === 'pink' ? 'bg-pink-400' : 'bg-blue-400';
 
                     return `
-                        <div class="p-3.5 rounded-2xl border-2 flex flex-col gap-1 hover:-translate-y-1 transition-transform cursor-default shadow-sm ${itemBg}">
-                            <div class="flex justify-between items-start mb-1">
+                        <div class="relative p-3.5 rounded-2xl border-2 flex flex-col gap-1 hover:-translate-y-1 transition-transform cursor-default shadow-sm ${itemBg}">
+                            ${generateEditControls(schedule)}
+                            <div class="flex justify-between items-start mb-1 pr-12">
                                 <span class="text-xs font-black tracking-tight ${timeColor}">
                                     ${schedule.startTime} <span class="text-slate-300 dark:text-slate-600 mx-0.5">-</span> ${schedule.endTime}
                                 </span>
-                                ${state.viewMode === '통합' ? `<div class="w-2 h-2 rounded-full ${dotClass}"></div>` : ''}
+                                ${state.viewMode === '통합' ? `<div class="w-2 h-2 rounded-full mt-1 ${dotClass}"></div>` : ''}
                             </div>
-                            <h4 class="text-base sm:text-lg font-black leading-tight">${schedule.title}</h4>
+                            <h4 class="text-base sm:text-lg font-black leading-tight pr-12">${schedule.title}</h4>
                             <p class="text-xs font-bold mt-1 flex items-center gap-1 text-slate-500 dark:text-slate-400">
                                 <span class="text-[10px] opacity-70">📐</span> ${schedule.subject}
                             </p>
@@ -492,11 +491,7 @@
                     `;
                 }).join('');
 
-                const emptyHtml = daySchedules.length === 0 ? `
-                    <div class="h-full min-h-[100px] flex items-center justify-center">
-                        <div class="w-8 h-1 rounded-full bg-slate-100 dark:bg-slate-700"></div>
-                    </div>
-                ` : '';
+                const emptyHtml = daySchedules.length === 0 ? `<div class="h-full min-h-[100px] flex items-center justify-center"><div class="w-8 h-1 rounded-full bg-slate-100 dark:bg-slate-700"></div></div>` : '';
 
                 return `
                     <div class="flex-1 min-w-[140px] flex flex-col rounded-3xl overflow-hidden transition-all duration-300 ${wrapperClass}">
@@ -505,41 +500,24 @@
                                 <h3 class="text-lg sm:text-xl font-black ${titleClass}">${day}</h3>
                                 ${isToday ? '<span class="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">오늘</span>' : ''}
                             </div>
-                            <span class="text-xs font-semibold text-slate-400 mt-1 inline-block bg-slate-100 dark:bg-slate-700 px-2 rounded-full">
-                                ${daySchedules.length}개
-                            </span>
+                            <span class="text-xs font-semibold text-slate-400 mt-1 inline-block bg-slate-100 dark:bg-slate-700 px-2 rounded-full">${daySchedules.length}개</span>
                         </div>
-                        <div class="p-3 flex flex-col gap-3 overflow-y-auto">
-                            ${itemsHtml}
-                            ${emptyHtml}
-                        </div>
+                        <div class="p-3 flex flex-col gap-3 overflow-y-auto">${itemsHtml}${emptyHtml}</div>
                     </div>
                 `;
             }).join('');
         };
 
-        const renderFilters = () => {
-            const buttons = document.querySelectorAll('.filter-btn');
-            buttons.forEach(btn => {
-                const view = btn.dataset.view;
-                if (state.viewMode === view) {
-                    btn.className = "filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-400";
-                } else {
-                    btn.className = "filter-btn flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-base font-bold transition-all whitespace-nowrap text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600";
-                }
-            });
-        };
-
         const renderApp = () => {
             renderHeaderAuthButton();
+            renderFiltersAndActions();
             renderMarquee();
-            renderFilters();
             renderToday();
             renderWeekly();
-            lucide.createIcons(); // DOM 갱신 후 아이콘 재생성
+            lucide.createIcons();
         };
 
-        // --- 구글 시트 데이터 동기화 (개선된 JSON 방식) ---
+        // --- 구글 시트 데이터 동기화 (개선된 JSON 방식 및 Row 식별자 추가) ---
         const fetchSheetData = async () => {
             if (state.isSyncing) return;
             state.isSyncing = true;
@@ -551,7 +529,6 @@
                 try {
                     const settingsTable = await fetchJsonFromGviz(URL_PREFIX + encodeURIComponent('설정'));
                     if (settingsTable && settingsTable.rows && settingsTable.rows.length > 0) {
-                        // 헤더가 있는 경우를 대비해 첫 번째 데이터 행을 가져옴
                         const row = settingsTable.rows[0]; 
                         const getCell = (colIdx) => {
                             if (!row.c || !row.c[colIdx]) return '';
@@ -560,14 +537,11 @@
                             if (cell.v === null || cell.v === undefined) return '';
                             return cell.v.toString().trim();
                         };
-                        
-                        state.settings.password = getCell(0) || '1234'; // A2
-                        state.settings.notice = getCell(1) || ''; // B2
+                        state.settings.password = getCell(0) || '1234';
+                        state.settings.notice = getCell(1) || '';
                         if(!state.isEditMode) state.editNotice = state.settings.notice;
                     }
-                } catch (e) {
-                    console.warn("설정 탭을 읽어오는데 실패했습니다 (기본값 유지)", e);
-                }
+                } catch (e) { console.warn("설정 탭 로드 실패", e); }
 
                 // 2. 스케줄 탭 로드
                 const processSheet = async (childName, color) => {
@@ -575,45 +549,34 @@
                     if (!table || !table.rows) return [];
                     
                     return table.rows.map((row, index) => {
-                        // row.c 구조에서 안전하게 텍스트 값 추출 (포맷된 값 우선)
                         const getCell = (colIdx) => {
                             if (!row.c || !row.c[colIdx]) return '';
                             const cell = row.c[colIdx];
-                            
-                            // 구글 시트에 보이는 포맷팅된 문자열(f) 우선 사용
-                            if (cell.f !== undefined && cell.f !== null) {
-                                return cell.f.toString().trim();
-                            }
-                            
-                            // 원본 데이터(v) 사용
+                            if (cell.f !== undefined && cell.f !== null) return cell.f.toString().trim();
                             if (cell.v === null || cell.v === undefined) return '';
                             let val = cell.v.toString().trim();
-                            
-                            // 구글 시트의 내부 Date 포맷을 시:분 형태로 자동 보정
                             if (val.startsWith('Date(')) {
                                 const match = val.match(/Date\((\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/);
-                                if (match) {
-                                    const h = match[4].padStart(2, '0');
-                                    const m = match[5].padStart(2, '0');
-                                    return `${h}:${m}`;
-                                }
+                                if (match) return `${match[4].padStart(2, '0')}:${match[5].padStart(2, '0')}`;
                             }
                             return val;
                         };
-
                         const rawDay = getCell(0);
-                        const day = normalizeDay(rawDay); // 요일 자동 인식
+                        const day = normalizeDay(rawDay);
+                        if (!day) return null;
 
-                        if (!day) return null; // 요일 정보가 없으면 무시
+                        // 실제 구글 시트에서의 행 번호 (헤더가 1행이므로 데이터는 2행부터 시작)
+                        const rowIndex = index + 2; 
 
                         return {
-                            id: `${childName}-${index}`, 
+                            id: `${childName}-${rowIndex}`, 
+                            rowIndex: rowIndex,
                             child: childName, 
                             color: color,
                             day: day, 
                             startTime: getCell(1) || '00:00', 
                             endTime: getCell(2) || '00:00', 
-                            title: getCell(3) || '일정', 
+                            title: getCell(3) || '', 
                             subject: getCell(4) || ''
                         };
                     }).filter(item => item !== null);
@@ -628,93 +591,160 @@
                 if (nayoonData.status === 'fulfilled') newSchedules.push(...nayoonData.value);
                 if (taeyoonData.status === 'fulfilled') newSchedules.push(...taeyoonData.value);
 
-                if (newSchedules.length > 0) {
-                    state.schedules = newSchedules;
-                    document.getElementById('sync-status').textContent = '동기화 완료';
-                } else {
-                    document.getElementById('sync-status').textContent = '데이터가 비어있습니다.';
-                }
+                state.schedules = newSchedules;
+                document.getElementById('sync-status').textContent = '동기화 완료';
 
             } catch (error) {
                 console.warn("구글 시트 연동 에러:", error);
-                document.getElementById('sync-status').textContent = '에러: 시트 주소 또는 형식을 확인하세요.';
-                // 실패 시 초기 모의데이터로 롤백 적용
-                if(state.schedules.length === 0){
-                     state.schedules = INITIAL_MOCK_DATA;
-                }
+                document.getElementById('sync-status').textContent = '에러: 시트 주소 확인';
             } finally {
                 state.isSyncing = false;
                 document.querySelector('.sync-icon').classList.remove('animate-spin');
                 renderApp();
-                setTimeout(() => {
-                   if(document.getElementById('sync-status').textContent === '동기화 완료'){
-                       document.getElementById('sync-status').textContent = '';
-                   }
-                }, 3000);
+                setTimeout(() => { if(document.getElementById('sync-status').textContent === '동기화 완료') document.getElementById('sync-status').textContent = ''; }, 3000);
+            }
+        };
+
+        // --- CRUD 요청 헬퍼 함수 ---
+        const sendGasRequest = async (action, data = {}) => {
+            if (GAS_WEB_APP_URL === '여기에_배포된_웹앱_URL을_입력하세요' || !GAS_WEB_APP_URL) {
+                throw new Error("GAS 웹앱 URL이 설정되지 않았습니다.");
+            }
+            const formData = new URLSearchParams();
+            formData.append('action', action);
+            formData.append('password', state.settings.password);
+            Object.keys(data).forEach(key => formData.append(key, data[key]));
+
+            const response = await fetch(GAS_WEB_APP_URL, { method: 'POST', body: formData });
+            const result = await response.json();
+            if (result.result !== 'success') throw new Error(result.message);
+            return result;
+        };
+
+        // --- 일정 추가/수정 모달 조작 함수 (전역 노출) ---
+        window.openScheduleModal = (schedule = null) => {
+            const modal = document.getElementById('schedule-modal');
+            const title = document.getElementById('schedule-modal-title');
+            const form = document.getElementById('schedule-form');
+            
+            if (schedule) {
+                // 수정 모드
+                title.innerHTML = `<i data-lucide="edit" class="w-6 h-6 text-indigo-500"></i> 일정 수정`;
+                document.getElementById('sch-mode').value = 'edit';
+                document.getElementById('sch-old-child').value = schedule.child;
+                document.getElementById('sch-row-index').value = schedule.rowIndex;
+                document.getElementById('sch-child').value = schedule.child;
+                document.getElementById('sch-day').value = schedule.day;
+                document.getElementById('sch-start').value = schedule.startTime;
+                document.getElementById('sch-end').value = schedule.endTime;
+                document.getElementById('sch-title').value = schedule.title;
+                document.getElementById('sch-subject').value = schedule.subject;
+            } else {
+                // 추가 모드
+                title.innerHTML = `<i data-lucide="calendar-plus" class="w-6 h-6 text-indigo-500"></i> 일정 추가`;
+                form.reset();
+                document.getElementById('sch-mode').value = 'add';
+            }
+            lucide.createIcons();
+            modal.classList.remove('hidden');
+        };
+
+        window.editSchedule = (id) => {
+            const schedule = state.schedules.find(s => s.id === id);
+            if (schedule) window.openScheduleModal(schedule);
+        };
+
+        window.deleteSchedule = async (id) => {
+            const schedule = state.schedules.find(s => s.id === id);
+            if (!schedule) return;
+            
+            if (!confirm(`[${schedule.child}] ${schedule.day} '${schedule.title}' 일정을 삭제하시겠습니까?`)) return;
+
+            document.getElementById('sync-status').textContent = '삭제 중...';
+            try {
+                await sendGasRequest('deleteSchedule', { child: schedule.child, rowIndex: schedule.rowIndex });
+                alert('성공적으로 삭제되었습니다.');
+                await fetchSheetData(); // 삭제 후 즉시 데이터 재동기화
+            } catch (e) {
+                alert('삭제 실패: ' + e.message);
+                document.getElementById('sync-status').textContent = '삭제 오류';
             }
         };
 
         // --- 초기화 및 이벤트 리스너 ---
         const init = () => {
-            // 시계 타이머
-            const updateClock = () => {
+            // 시계
+            setInterval(() => {
                 const now = new Date();
                 const daysStr = ['일', '월', '화', '수', '목', '금', '토'];
-                document.getElementById('clock-date').textContent = 
-                    `${now.getFullYear()}년 ${String(now.getMonth() + 1).padStart(2, '0')}월 ${String(now.getDate()).padStart(2, '0')}일 (${daysStr[now.getDay()]})`;
-                document.getElementById('clock-hm').textContent = 
-                    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                document.getElementById('clock-date').textContent = `${now.getFullYear()}년 ${String(now.getMonth() + 1).padStart(2, '0')}월 ${String(now.getDate()).padStart(2, '0')}일 (${daysStr[now.getDay()]})`;
+                document.getElementById('clock-hm').textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                 document.getElementById('clock-s').textContent = `:${String(now.getSeconds()).padStart(2, '0')}`;
-            };
-            setInterval(updateClock, 1000);
-            updateClock();
+            }, 1000);
 
-            // 이벤트 바인딩
+            // 기본 이벤트
             document.getElementById('btn-sync').addEventListener('click', fetchSheetData);
-            
             document.getElementById('btn-darkmode').addEventListener('click', () => {
                 state.isDarkMode = !state.isDarkMode;
-                if (state.isDarkMode) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
+                document.documentElement.classList.toggle('dark', state.isDarkMode);
             });
+            document.getElementById('search-input').addEventListener('input', (e) => { state.searchTerm = e.target.value; renderWeekly(); });
 
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    state.viewMode = e.currentTarget.dataset.view;
-                    renderApp();
-                });
-            });
-
-            document.getElementById('search-input').addEventListener('input', (e) => {
-                state.searchTerm = e.target.value;
-                renderWeekly(); // 검색은 주간만 리렌더링
-            });
-
-            // 모달 처리
-            const modal = document.getElementById('auth-modal');
-            document.getElementById('close-modal').addEventListener('click', () => modal.classList.add('hidden'));
+            // 부모 인증 모달
+            document.getElementById('close-modal').addEventListener('click', () => document.getElementById('auth-modal').classList.add('hidden'));
             document.getElementById('auth-form').addEventListener('submit', (e) => {
                 e.preventDefault();
-                const pwd = document.getElementById('password-input').value;
-                if (pwd === state.settings.password) {
+                if (document.getElementById('password-input').value === state.settings.password) {
                     state.isEditMode = true;
                     state.editNotice = state.settings.notice;
-                    modal.classList.add('hidden');
+                    document.getElementById('auth-modal').classList.add('hidden');
                     document.getElementById('password-input').value = '';
                     renderApp();
-                } else {
-                    alert('비밀번호가 일치하지 않습니다.');
+                } else { alert('비밀번호가 일치하지 않습니다.'); }
+            });
+
+            // 스케줄 모달
+            const scheduleModal = document.getElementById('schedule-modal');
+            document.getElementById('close-schedule-modal').addEventListener('click', () => scheduleModal.classList.add('hidden'));
+            
+            document.getElementById('schedule-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const mode = document.getElementById('sch-mode').value;
+                const btn = document.getElementById('btn-submit-schedule');
+                
+                const payload = {
+                    child: document.getElementById('sch-child').value,
+                    day: document.getElementById('sch-day').value,
+                    startTime: document.getElementById('sch-start').value,
+                    endTime: document.getElementById('sch-end').value,
+                    title: document.getElementById('sch-title').value,
+                    subject: document.getElementById('sch-subject').value
+                };
+
+                if (mode === 'edit') {
+                    payload.oldChild = document.getElementById('sch-old-child').value;
+                    payload.rowIndex = document.getElementById('sch-row-index').value;
+                }
+
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 저장 중...`;
+                btn.disabled = true; lucide.createIcons();
+
+                try {
+                    await sendGasRequest(mode === 'edit' ? 'editSchedule' : 'addSchedule', payload);
+                    scheduleModal.classList.add('hidden');
+                    alert(`일정이 성공적으로 ${mode === 'edit' ? '수정' : '추가'}되었습니다.`);
+                    await fetchSheetData(); // 저장 후 즉시 재동기화
+                } catch (err) {
+                    alert('저장 실패: ' + err.message);
+                } finally {
+                    btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> 저장하기`;
+                    btn.disabled = false; lucide.createIcons();
                 }
             });
 
-            // 첫 데이터 로드
             fetchSheetData();
         };
 
-        // 앱 시작
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
