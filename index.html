@@ -520,14 +520,12 @@
             if (state.isSyncing) return;
             state.isSyncing = true;
             
-            // 사용자가 수동 갱신할 때만 UI에 동기화 중 표시
             if (!isBackground) {
                 document.getElementById('sync-status').textContent = '데이터 불러오는 중...';
                 document.querySelector('.sync-icon').classList.add('animate-spin');
             }
             
             try {
-                // 강력한 캐시 방지(Cache Buster)를 위해 타임스탬프 추가
                 const timestamp = new Date().getTime();
 
                 // 1. 설정 탭 로드
@@ -566,11 +564,12 @@
                             }
                             return val;
                         };
-                        const rawDay = getCell(0);
+                        
+                        // [A:요일, B:과목, C:학원명, D:시작시간, E:종료시간] 매핑
+                        const rawDay = getCell(0); // Col A: 요일
                         const day = normalizeDay(rawDay);
                         if (!day) return null;
 
-                        // 실제 구글 시트에서의 행 번호 (헤더가 1행이므로 데이터는 2행부터 시작)
                         const rowIndex = index + 2; 
 
                         return {
@@ -579,10 +578,10 @@
                             child: childName, 
                             color: color,
                             day: day, 
-                            startTime: getCell(1) || '00:00', 
-                            endTime: getCell(2) || '00:00', 
-                            title: getCell(3) || '', 
-                            subject: getCell(4) || ''
+                            subject: getCell(1) || '',      // Col B: 과목
+                            title: getCell(2) || '',        // Col C: 학원명
+                            startTime: getCell(3) || '00:00', // Col D: 시작시간
+                            endTime: getCell(4) || '00:00'    // Col E: 종료시간
                         };
                     }).filter(item => item !== null);
                 };
